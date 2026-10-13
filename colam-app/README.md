@@ -1,0 +1,28 @@
+# Colamgram 💙💚🧡
+
+Red social tipo Instagram **exclusiva para la prepa del Colegio Americano de Saltillo (Colam High School)**, con los colores de la escuela: azul marino, verde y naranja.
+
+## Funciones
+
+- **Acceso exclusivo**: para entrar se pide el código de la prepa (por defecto `COLAM`; se cambia en `ACCESS_CODE` dentro de `app.js`), además de nombre, usuario, semestre (1°–6°) y grupo.
+- **Feed** con fotos, "me gusta" (también con doble toque ❤️), comentarios, guardar y compartir.
+- **Historias** que duran 24 horas, con visor a pantalla completa.
+- **Explorar**: busca alumnos y #hashtags, y filtra por categoría (Eventos, Deportes, Académico, Arte, Clubs, Vida Colam).
+- **Avisos de la prepa**: anuncios oficiales de la escuela y tu actividad (los likes y comentarios que recibes). Las cuentas oficiales o de staff pueden publicar avisos.
+- **Perfil** con foto, biografía, semestre y grupo, cuadrícula de publicaciones y publicaciones guardadas.
+- **Convivencia sana**: filtro de groserías, botón para reportar publicaciones y recordatorio de los valores Colam (honestidad, compromiso, respeto y responsabilidad).
+- Se puede **instalar en el celular** como app ("Agregar a pantalla de inicio").
+
+## Cómo abrirla
+
+Es una app web sin dependencias. Desde esta carpeta:
+
+```bash
+python3 -m http.server 8000
+```
+
+y abre <http://localhost:8000>. También se puede publicar gratis con GitHub Pages.
+
+## Importante: siguiente paso para usarla con toda la escuela
+
+Esta versión guarda todo **en el navegador de cada dispositivo** (localStorage), así que sirve como prototipo o demo: cada quien ve sus propias publicaciones y las de ejemplo. Para que todos los alumnos vean las publicaciones de todos, hace falta conectarla a un servidor, por ejemplo **Firebase** (Auth + Firestore + Storage) o **Supabase**. Con eso también se puede limitar el acceso a los correos institucionales de la escuela en lugar de usar un código compartido.
