@@ -1,7 +1,6 @@
 /* Colamgram — red social de la prepa del Colegio Americano de Saltillo (Colam High School).
    Todo vive en el navegador (localStorage). Ver README para conectarlo a un servidor real. */
 
-const ACCESS_CODE = 'COLAM'; // código que la escuela comparte con sus alumnos
 const STORE_KEY = 'colamgram.v1';
 const STORY_MS = 5000;
 const STORY_TTL = 24 * 60 * 60 * 1000;
@@ -478,7 +477,7 @@ function renderProfile(view) {
     });
   } else {
     $('#editBtn').onclick = () => { editing = true; render(); };
-    $('#logoutBtn').onclick = () => { if (confirm('¿Cerrar sesión?')) { db.me = null; save(); start(); } };
+    $('#logoutBtn').onclick = () => { if (confirm('¿Cerrar sesión?')) logout(); };
   }
 }
 
@@ -525,22 +524,117 @@ async function sharePost(p) {
   } catch { /* el usuario canceló */ }
 }
 
-/* ---------- Acceso ---------- */
+/* ---------- Acceso con correo de la escuela ---------- */
+
+const FIREBASE_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+const EMAIL_KEY = 'colamgram.emailForSignIn';
+let pendingEmail = null;
+let firebase = null;
+
+function isSchoolEmail(email) {
+  return /^[^\s@]+@[^\s@]+$/.test(email) && SCHOOL_DOMAINS.some(d => email.endsWith('@' + d.toLowerCase()));
+}
+
+async function loadFirebase() {
+  if (!FIREBASE_CONFIG) return null;
+  if (!firebase) {
+    const [{ initializeApp }, m] = await Promise.all([
+      import(FIREBASE_SDK + 'firebase-app.js'),
+      import(FIREBASE_SDK + 'firebase-auth.js'),
+    ]);
+    firebase = { auth: m.getAuth(initializeApp(FIREBASE_CONFIG)), m };
+    firebase.auth.languageCode = 'es';
+  }
+  return firebase;
+}
+
+function showAuthStep(step) {
+  $('#emailForm').hidden = step !== 'email';
+  $('#linkSent').hidden = step !== 'sent';
+  $('#authForm').hidden = step !== 'profile';
+}
+
+// Ya se comprobó que el correo es de la escuela: entra, o crea su perfil la primera vez.
+function onEmailVerified(email) {
+  const username = Object.keys(db.users).find(u => db.users[u].email === email);
+  if (username) { db.me = username; save(); return start(); }
+  pendingEmail = email;
+  $('#verifiedEmail').textContent = email;
+  const f = $('#authForm');
+  if (!f.username.value) f.username.value = email.split('@')[0].toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 20);
+  showAuthStep('profile');
+}
+
+$('#emailInput').placeholder = 'tu.nombre@' + SCHOOL_DOMAINS[0];
+$('#demoNote').hidden = !!FIREBASE_CONFIG;
+
+$('#emailForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('#emailError'), btn = e.target.querySelector('button');
+  const email = e.target.email.value.trim().toLowerCase();
+  err.textContent = '';
+  if (!isSchoolEmail(email)) return void (err.textContent = `Usa tu correo de la escuela (@${SCHOOL_DOMAINS.join(', @')}).`);
+  if (!FIREBASE_CONFIG) return onEmailVerified(email);
+  btn.disabled = true;
+  try {
+    const { auth, m } = await loadFirebase();
+    await m.sendSignInLinkToEmail(auth, email, { url: location.href.split(/[?#]/)[0], handleCodeInApp: true });
+    try { localStorage.setItem(EMAIL_KEY, email); } catch { /* sin almacenamiento */ }
+    $('#sentTo').textContent = email;
+    showAuthStep('sent');
+  } catch {
+    err.textContent = 'No se pudo enviar el enlace. Revisa tu conexión e inténtalo de nuevo.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('#changeEmail').onclick = () => showAuthStep('email');
 
 $('#authForm').addEventListener('submit', e => {
   e.preventDefault();
   const f = e.target, err = $('#authError');
   const username = f.username.value.trim().toLowerCase();
-  if (f.code.value.trim().toUpperCase() !== ACCESS_CODE) return void (err.textContent = 'Código incorrecto. Pídelo en coordinación de prepa.');
+  if (!pendingEmail) return showAuthStep('email');
   if (!/^[a-z0-9._]{3,20}$/.test(username)) return void (err.textContent = 'Usuario inválido: usa minúsculas, números, punto o guion bajo.');
   if (!isClean(username + ' ' + f.name.value)) return void (err.textContent = 'Elige un nombre de usuario respetuoso.');
-  const existing = db.users[username];
-  if (existing && (existing.official || existing.staff)) return void (err.textContent = 'Ese usuario está reservado.');
-  db.users[username] = { ...(existing || {}), name: f.name.value.trim(), semester: +f.semester.value, group: f.group.value, bio: existing?.bio || '' };
+  if (db.users[username]) return void (err.textContent = 'Ese usuario ya está ocupado, elige otro.');
+  db.users[username] = { email: pendingEmail, name: f.name.value.trim(), semester: +f.semester.value, group: f.group.value, bio: '' };
   db.me = username;
+  pendingEmail = null;
   save();
   start();
 });
+
+// Si el alumno llega desde el enlace del correo, termina el inicio de sesión.
+async function completeEmailLink() {
+  const fb = await loadFirebase().catch(() => null);
+  if (!fb || !fb.m.isSignInWithEmailLink(fb.auth, location.href)) return false;
+  let email = null;
+  try { email = localStorage.getItem(EMAIL_KEY); } catch { /* sin almacenamiento */ }
+  email = (email || prompt('Confirma tu correo de la escuela:') || '').trim().toLowerCase();
+  try {
+    if (!isSchoolEmail(email)) throw new Error('dominio');
+    await fb.m.signInWithEmailLink(fb.auth, email, location.href);
+    try { localStorage.removeItem(EMAIL_KEY); } catch { /* sin almacenamiento */ }
+    history.replaceState(null, '', location.pathname);
+    onEmailVerified(email);
+    return true;
+  } catch {
+    history.replaceState(null, '', location.pathname);
+    $('#emailError').textContent = 'El enlace no es válido o ya expiró. Pide uno nuevo.';
+    return false;
+  }
+}
+
+async function logout() {
+  db.me = null;
+  save();
+  const fb = await loadFirebase().catch(() => null);
+  if (fb) await fb.m.signOut(fb.auth).catch(() => {});
+  showAuthStep('email');
+  start();
+}
 
 function start() {
   const logged = db.me && db.users[db.me];
@@ -549,4 +643,6 @@ function start() {
   if (logged) go('feed');
 }
 
+showAuthStep('email');
 start();
+if (!db.me) completeEmailLink();

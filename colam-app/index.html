@@ -19,7 +19,25 @@
       <img src="assets/logo.png" alt="Colegio Americano · Colam High School" class="auth-logo">
       <h1 class="brand">Colam<span>gram</span></h1>
       <p class="auth-sub">La red social exclusiva de la prepa del Colegio Americano de Saltillo</p>
-      <form id="authForm" autocomplete="off">
+      <!-- Paso 1: correo de la escuela -->
+      <form id="emailForm" autocomplete="on">
+        <label>Correo de la escuela<input name="email" type="email" required autocomplete="email" inputmode="email" id="emailInput"></label>
+        <p id="emailError" class="error" role="alert"></p>
+        <button class="btn primary" type="submit">Continuar</button>
+        <p id="demoNote" class="auth-note" hidden>Modo demo: se revisa que el correo sea de la escuela, pero todavía no se manda enlace de verificación.</p>
+      </form>
+
+      <!-- Paso 1b: enlace enviado -->
+      <div id="linkSent" class="link-sent" hidden>
+        <p class="big">📬</p>
+        <p>Te mandamos un enlace a <b id="sentTo"></b>.</p>
+        <p class="auth-note">Ábrelo desde este mismo dispositivo para entrar. Si no llega, revisa la carpeta de spam.</p>
+        <button class="btn ghost" type="button" id="changeEmail">Usar otro correo</button>
+      </div>
+
+      <!-- Paso 2: crear perfil (solo la primera vez) -->
+      <form id="authForm" autocomplete="off" hidden>
+        <p class="auth-note">Entrando como <b id="verifiedEmail"></b></p>
         <label>Nombre completo<input name="name" required maxlength="40" placeholder="Ej. Ana López"></label>
         <label>Usuario<input name="username" required maxlength="20" pattern="[a-z0-9._]{3,20}" placeholder="ana.lopez" title="3–20 caracteres: minúsculas, números, punto o guion bajo"></label>
         <div class="row">
@@ -35,9 +53,8 @@
             </select>
           </label>
         </div>
-        <label>Código de la prepa<input name="code" required placeholder="Lo da tu escuela" autocapitalize="characters"></label>
         <p id="authError" class="error" role="alert"></p>
-        <button class="btn primary" type="submit">Entrar</button>
+        <button class="btn primary" type="submit">Crear mi perfil</button>
       </form>
       <p class="auth-foot">Honestidad · Compromiso · Respeto · Responsabilidad</p>
     </div>
@@ -88,6 +105,7 @@
 
   <div id="toast" class="toast" role="status"></div>
 
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
